@@ -1,0 +1,16 @@
+image:
+  repository: myapp
+  tag: latest
+ports:
+  - name: http
+    containerPort: 8080
+service:
+  main:
+    port: 8080
+database:
+  main:
+    type: external
+    secretName: existing-db-creds
+    env:
+      DB_HOST: host
+      DB_PASS: password

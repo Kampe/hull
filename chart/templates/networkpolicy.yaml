@@ -1,0 +1,54 @@
+{{- if .Values.networkPolicy.enabled }}
+{{- $fullname := include "hull.fullname" . -}}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $fullname }}
+  labels:
+    {{- include "hull.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "hull.selectorLabels" . | nindent 6 }}
+  policyTypes:
+    - Ingress
+    - Egress
+  {{- if .Values.networkPolicy.ingress }}
+  ingress:
+    {{- toYaml .Values.networkPolicy.ingress | nindent 4 }}
+  {{- else }}
+  {{- $ingressPorts := list }}
+  {{- range $svcName, $svcConfig := .Values.service }}
+  {{- $enabled := true }}
+  {{- if hasKey $svcConfig "enabled" }}
+  {{- $enabled = $svcConfig.enabled }}
+  {{- end }}
+  {{- if $enabled }}
+  {{- $svcPorts := include "hull.servicePorts" (dict "root" $ "serviceName" $svcName "svcConfig" $svcConfig) | fromYamlArray | default list }}
+  {{- range $svcPorts }}
+  {{- $ingressPorts = append $ingressPorts (dict "port" .port "protocol" .protocol) }}
+  {{- end }}
+  {{- end }}
+  {{- end }}
+  {{- if $ingressPorts }}
+  ingress:
+    - ports:
+        {{- range $ingressPorts }}
+        - port: {{ .port }}
+          protocol: {{ .protocol }}
+        {{- end }}
+  {{- end }}
+  {{- end }}
+  {{- if .Values.networkPolicy.egress }}
+  egress:
+    {{- toYaml .Values.networkPolicy.egress | nindent 4 }}
+  {{- else }}
+  egress:
+    - ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+    - {}
+  {{- end }}
+{{- end }}

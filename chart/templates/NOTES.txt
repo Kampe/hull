@@ -1,0 +1,18 @@
+{{ $fullname := include "hull.fullname" . -}}
+Hull deployed {{ $fullname }} successfully.
+
+{{- if .Values.ingress }}
+{{- range $name, $ing := .Values.ingress }}
+{{- if $ing.hostname }}
+
+  {{ if eq ($.Values.routeType | default "ingress") "gateway" }}HTTPRoute{{ else }}Ingress{{ end }}: https://{{ $ing.hostname }}
+{{- end }}
+{{- end }}
+{{- end }}
+
+{{- range $name, $svc := .Values.service }}
+{{- if ne (hasKey $svc "enabled" | ternary $svc.enabled true | toString) "false" }}
+
+  Service: {{ if eq $name "main" }}{{ $fullname }}{{ else }}{{ $fullname }}-{{ $name }}{{ end }}
+{{- end }}
+{{- end }}

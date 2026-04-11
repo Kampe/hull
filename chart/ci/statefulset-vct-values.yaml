@@ -1,0 +1,25 @@
+image:
+  repository: docker.io/library/postgres
+  tag: "16"
+
+workloadType: StatefulSet
+
+ports:
+  - name: postgres
+    containerPort: 5432
+
+service:
+  main:
+    port: 5432
+
+persistence:
+  data:
+    type: volumeClaimTemplate
+    mountPath: /var/lib/postgresql/data
+    size: 20Gi
+    storageClass: fast-ssd
+    accessMode: ReadWriteOnce
+    labels:
+      backup: daily
+    annotations:
+      volume.kubernetes.io/selected-node: worker-1

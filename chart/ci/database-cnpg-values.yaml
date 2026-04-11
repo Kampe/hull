@@ -1,0 +1,32 @@
+image:
+  repository: ghcr.io/immich-app/immich-server
+  tag: latest
+ports:
+  - name: http
+    containerPort: 3001
+service:
+  main:
+    port: 3001
+database:
+  main:
+    type: cnpg
+    database: immich
+    user: immich
+    instances: 2
+    storage:
+      size: 10Gi
+    walStorage:
+      size: 5Gi
+    monitoring:
+      enabled: true
+    backup:
+      schedule: "0 0 * * *"
+    pooler:
+      instances: 2
+      poolMode: session
+    env:
+      DATABASE_URL: uri
+      DATABASE_HOST: host
+      DATABASE_PORT: port
+      DATABASE_PASSWORD: password
+    injectIntoInitContainers: true

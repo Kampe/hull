@@ -1,0 +1,23 @@
+{{- if .Values.metrics.enabled }}
+{{- $fullname := include "hull.fullname" . -}}
+{{- $labels := include "hull.labels" . -}}
+{{- $portName := .Values.metrics.port | default (include "hull.servicePortName" (dict "root" . "serviceName" "main" "svcConfig" (index .Values.service "main"))) }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ $fullname }}
+  labels:
+    {{- $labels | nindent 4 }}
+    instance: primary
+    {{- with .Values.metrics.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "hull.selectorLabels" . | nindent 6 }}
+  endpoints:
+    - port: {{ $portName }}
+      path: {{ .Values.metrics.path | default "/metrics" }}
+      interval: {{ .Values.metrics.interval | default "30s" }}
+{{- end }}

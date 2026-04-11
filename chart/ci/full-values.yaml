@@ -1,0 +1,196 @@
+# Full-featured deployment: everything enabled
+image:
+  repository: ghcr.io/karakeep-app/karakeep
+  tag: latest
+  pullPolicy: Always
+
+replicas: 2
+
+command: ["/bin/sh"]
+args: ["-c", "start-app"]
+
+ports:
+  - name: http
+    containerPort: 3000
+  - name: metrics
+    containerPort: 9090
+
+env:
+  APP_ENV: production
+  DATABASE_URL:
+    secretKeyRef:
+      name: app-secrets
+      key: database-url
+  CONFIG_PATH:
+    configMapKeyRef:
+      name: app-config
+      key: config-path
+  POD_NAME:
+    fieldRef:
+      fieldPath: metadata.name
+
+probes:
+  liveness:
+    type: http
+    path: /healthz
+    port: http
+    periodSeconds: 15
+  readiness:
+    type: http
+    path: /readyz
+    port: http
+  startup:
+    type: http
+    path: /healthz
+    port: http
+    failureThreshold: 60
+
+resources:
+  requests:
+    cpu: 200m
+    memory: 256Mi
+  limits:
+    memory: 512Mi
+
+sidecars:
+  redis:
+    image:
+      repository: redis
+      tag: "7"
+    port: 6379
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        memory: 128Mi
+  exporter:
+    image:
+      repository: prom/node-exporter
+      tag: latest
+    port: 9100
+    probes:
+      liveness:
+        type: http
+        path: /metrics
+        port: 9100
+
+initContainers:
+  migrations:
+    image:
+      repository: ghcr.io/karakeep-app/karakeep
+      tag: latest
+    command: ["sh", "-c", "run-migrations"]
+    env:
+      DATABASE_URL:
+        secretKeyRef:
+          name: app-secrets
+          key: database-url
+
+service:
+  main:
+    port: 3000
+
+ingress:
+  main:
+    hostname: app.example.com
+    certManager: true
+    externalDns: true
+    authentik: true
+    proxyBodySize: "50m"
+  api:
+    hostname: api.example.com
+    certManager: true
+    externalDns: true
+    service: main
+    path: /api
+    annotations:
+      nginx.ingress.kubernetes.io/rewrite-target: /api
+
+persistence:
+  data:
+    size: 10Gi
+    mountPath: /data
+    storageClass: longhorn
+  cache:
+    type: emptyDir
+    mountPath: /cache
+  media:
+    type: nfs
+    server: 192.168.1.100
+    path: /mnt/media
+    mountPath: /media
+
+configMaps:
+  app-config:
+    data:
+      config-path: /etc/app/config.yml
+
+metrics:
+  enabled: true
+  port: metrics
+  path: /metrics
+  interval: 15s
+  labels:
+    team: platform
+
+securityPreset: default
+securityContext:
+  readOnlyRootFilesystem: false
+
+podSecurityContext:
+  fsGroup: 1000
+  fsGroupChangePolicy: OnRootMismatch
+
+serviceAccount:
+  create: true
+  name: karakeep
+  annotations:
+    app: karakeep
+
+rbac:
+  create: true
+  rules:
+    - apiGroups: [""]
+      resources: ["configmaps"]
+      verbs: ["get", "list"]
+
+networkPolicy:
+  enabled: true
+
+nodeSelector:
+  kubernetes.io/arch: amd64
+
+tolerations:
+  - key: dedicated
+    operator: Equal
+    value: apps
+    effect: NoSchedule
+
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values: [hull]
+          topologyKey: kubernetes.io/hostname
+
+topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: kubernetes.io/hostname
+    whenUnsatisfiable: DoNotSchedule
+    labelSelector:
+      matchLabels:
+        app.kubernetes.io/name: hull
+
+terminationGracePeriodSeconds: 60
+
+podAnnotations:
+  prometheus.io/scrape: "true"
+
+podLabels:
+  team: platform

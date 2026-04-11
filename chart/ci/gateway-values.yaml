@@ -1,0 +1,21 @@
+# Gateway API HTTPRoute
+image:
+  repository: nginx
+  tag: latest
+
+ports:
+  - name: http
+    containerPort: 8080
+
+service:
+  main:
+    port: 8080
+
+routeType: gateway
+gatewayName: main-gateway
+gatewayNamespace: gateway-system
+gatewaySectionName: https
+
+ingress:
+  main:
+    hostname: app.example.com

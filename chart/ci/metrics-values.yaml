@@ -1,0 +1,20 @@
+# ServiceMonitor and metrics
+image:
+  repository: ghcr.io/advplyr/audiobookshelf
+  tag: latest
+
+ports:
+  - name: http
+    containerPort: 80
+
+service:
+  main:
+    port: 80
+
+metrics:
+  enabled: true
+  path: /metrics
+  port: http
+  interval: 30s
+  labels:
+    team: platform

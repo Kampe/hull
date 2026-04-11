@@ -1,0 +1,51 @@
+{{- $fullname := include "hull.fullname" . -}}
+{{- $labels := include "hull.labels" . -}}
+{{- range $name, $ing := .Values.ingress }}
+{{- if and $ing.hostname (ne ($.Values.routeType | default "ingress") "gateway") }}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ if eq $name "main" }}{{ $fullname }}{{ else }}{{ $fullname }}-{{ $name }}{{ end }}
+  labels:
+    {{- $labels | nindent 4 }}
+  annotations:
+    {{- /* cert-manager */ -}}
+    {{- if ne ($ing.certManager | toString) "false" }}
+    cert-manager.io/cluster-issuer: {{ $ing.clusterIssuer | default "vault-issuer" }}
+    {{- end }}
+    {{- /* external-dns */ -}}
+    {{- if ne ($ing.externalDns | toString) "false" }}
+    external-dns.alpha.kubernetes.io/hostname: {{ $ing.hostname | quote }}
+    {{- end }}
+    {{- /* Authentik forward-auth */ -}}
+    {{- if $ing.authentik }}
+    {{- include "hull.authentikAnnotations" $ing.hostname | nindent 4 }}
+    {{- end }}
+    {{- /* proxy-body-size */ -}}
+    {{- if $ing.proxyBodySize }}
+    nginx.ingress.kubernetes.io/proxy-body-size: {{ $ing.proxyBodySize | quote }}
+    {{- end }}
+    {{- /* User annotations (merged last, can override) */ -}}
+    {{- with $ing.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  ingressClassName: {{ $ing.className | default "nginx" }}
+  tls:
+    - hosts:
+        - {{ $ing.hostname }}
+      secretName: {{ $fullname }}{{ if ne $name "main" }}-{{ $name }}{{ end }}-tls
+  rules:
+    - host: {{ $ing.hostname }}
+      http:
+        paths:
+          - path: {{ $ing.path | default "/" }}
+            pathType: {{ $ing.pathType | default "Prefix" }}
+            backend:
+              service:
+                name: {{ if and $ing.service (ne $ing.service "main") }}{{ $fullname }}-{{ $ing.service }}{{ else }}{{ $fullname }}{{ end }}
+                port:
+                  number: {{ $ing.servicePort | default (include "hull.servicePort" (dict "root" $ "serviceName" ($ing.service | default "main") "svcConfig" (index $.Values.service ($ing.service | default "main")))) }}
+{{- end }}
+{{- end }}

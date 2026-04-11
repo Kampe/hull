@@ -1,0 +1,83 @@
+{{- $fullname := include "hull.fullname" . -}}
+{{- $labels := include "hull.labels" . -}}
+{{- range $dbName, $db := .Values.database }}
+{{- $clusterName := printf "%s-%s" $fullname $dbName }}
+{{- if eq ($db.type | default "cnpg") "cnpg" }}
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: {{ $clusterName }}
+  labels:
+    {{- $labels | nindent 4 }}
+spec:
+  instances: {{ $db.instances | default 2 }}
+  storage:
+    size: {{ ($db.storage).size | default "5Gi" }}
+    {{- if ($db.storage).storageClass }}
+    storageClass: {{ ($db.storage).storageClass }}
+    {{- end }}
+  {{- if and $db.walStorage ($db.walStorage).size }}
+  walStorage:
+    size: {{ ($db.walStorage).size }}
+  {{- end }}
+  bootstrap:
+    initdb:
+      database: {{ $db.database | default $dbName }}
+      owner: {{ $db.user | default $dbName }}
+  {{- with $db.resources }}
+  resources:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  monitoring:
+    enablePodMonitor: {{ ($db.monitoring).enabled | default false }}
+{{- if $db.backup }}
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: {{ $clusterName }}
+  labels:
+    {{- $labels | nindent 4 }}
+spec:
+  schedule: {{ $db.backup.schedule | quote }}
+  backupOwnerReference: self
+  cluster:
+    name: {{ $clusterName }}
+{{- end }}
+{{- if $db.pooler }}
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Pooler
+metadata:
+  name: {{ $clusterName }}-pooler
+  labels:
+    {{- $labels | nindent 4 }}
+spec:
+  cluster:
+    name: {{ $clusterName }}
+  instances: {{ $db.pooler.instances | default 2 }}
+  type: rw
+  pgbouncer:
+    poolMode: {{ $db.pooler.poolMode | default "session" }}
+{{- end }}
+{{- else if eq $db.type "crossplane" }}
+---
+apiVersion: {{ $db.claim.apiVersion }}
+kind: {{ $db.claim.kind }}
+metadata:
+  name: {{ $clusterName }}
+  labels:
+    {{- $labels | nindent 4 }}
+spec:
+  {{- with $db.spec }}
+  {{- toYaml . | nindent 2 }}
+  {{- end }}
+  {{- with $db.compositionSelector }}
+  compositionSelector:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  writeConnectionSecretToRef:
+    name: {{ $clusterName }}-conn
+{{- end }}
+{{- end }}

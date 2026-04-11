@@ -1,0 +1,56 @@
+# Various persistence types
+image:
+  repository: ghcr.io/advplyr/audiobookshelf
+  tag: latest
+
+ports:
+  - name: http
+    containerPort: 80
+
+service:
+  main:
+    port: 80
+
+persistence:
+  config:
+    size: 5Gi
+    mountPath: /config
+  media:
+    type: nfs
+    server: 192.168.1.100
+    path: /mnt/media/media
+    mountPath: /audiobooks
+  cache:
+    type: emptyDir
+    mountPath: /cache
+  app-config:
+    type: configmap
+    objectName: app-settings
+    mountPath: /etc/app/config.yml
+    subPath: config.yml
+    items:
+      - key: config.yml
+        path: config.yml
+  certs:
+    type: secret
+    objectName: vault-ca
+    mountPath: /etc/ssl/self-signed-certs/
+    items:
+      - key: ca.crt
+        path: ca.crt
+  device:
+    type: hostPath
+    hostPath: /dev/bus/usb
+    hostPathType: Directory
+    mountPath: /dev/bus/usb
+
+configMaps:
+  app-settings:
+    data:
+      config.yml: |
+        server:
+          port: 80
+        logging:
+          level: info
+
+securityPreset: root

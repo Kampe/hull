@@ -1,0 +1,86 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+        with:
+          version: v3.17.3
+      - name: Helm lint
+        run: helm lint chart/
+
+  template-test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        values:
+          - advanced-services-values.yaml
+          - envfrom-values.yaml
+          - minimal-values.yaml
+          - single-container-values.yaml
+          - multi-container-values.yaml
+          - ingress-values.yaml
+          - ingress-disabled-integrations-values.yaml
+          - persistence-values.yaml
+          - metrics-values.yaml
+          - pdb-values.yaml
+          - security-values.yaml
+          - statefulset-vct-values.yaml
+          - gateway-values.yaml
+          - full-values.yaml
+          - database-cnpg-values.yaml
+          - database-external-values.yaml
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+        with:
+          version: v3.17.3
+      - name: "Template: ${{ matrix.values }}"
+        run: helm template test chart/ -f "chart/ci/${{ matrix.values }}"
+
+  test-suite:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+        with:
+          version: v3.17.3
+      - name: Run test suite
+        run: bash tests/test_chart.sh
+
+  release:
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    needs: [lint, template-test, test-suite]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: azure/setup-helm@v4
+        with:
+          version: v3.17.3
+      - name: Login to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io -u "${{ github.actor }}" --password-stdin
+      - name: Extract chart version
+        id: version
+        run: |
+          VERSION=$(grep '^version:' chart/Chart.yaml | awk '{print $2}')
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+      - name: Package chart
+        run: helm package chart/
+      - name: Push to GHCR
+        run: helm push "hull-${{ steps.version.outputs.version }}.tgz" oci://ghcr.io/kampe

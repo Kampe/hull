@@ -1,0 +1,45 @@
+# Service model coverage: multi-port main service + sidecar-targeted service
+image:
+  repository: ghcr.io/example/app
+  tag: latest
+
+ports:
+  - name: http
+    containerPort: 8080
+  - name: grpc
+    containerPort: 9090
+
+probes:
+  enabled: false
+
+sidecars:
+  redis:
+    image:
+      repository: redis
+      tag: "7"
+    ports:
+      - name: redis
+        containerPort: 6379
+      - name: metrics
+        containerPort: 9121
+    probes:
+      enabled: false
+
+service:
+  main:
+    ports:
+      http:
+        port: 80
+        targetPort: http
+      grpc:
+        port: 9090
+        targetPort: grpc
+  redis:
+    targetContainer: redis
+    ports:
+      redis:
+        port: 6379
+        targetPort: redis
+      metrics:
+        port: 9121
+        targetPort: metrics

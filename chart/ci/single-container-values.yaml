@@ -1,0 +1,18 @@
+# Single container with port, service, and ingress
+image:
+  repository: glanceapp/glance
+  tag: latest
+
+ports:
+  - name: http
+    containerPort: 8080
+
+service:
+  main:
+    port: 8080
+
+ingress:
+  main:
+    hostname: glance.example.com
+    certManager: true
+    externalDns: true

@@ -1,0 +1,20 @@
+{{- $fullname := include "hull.fullname" . -}}
+{{- $labels := include "hull.labels" . -}}
+{{- range $name, $cm := .Values.configMaps }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $fullname }}-{{ $name }}
+  labels:
+    {{- $labels | nindent 4 }}
+data:
+  {{- range $key, $value := $cm.data }}
+  {{- if contains "\n" ($value | toString) }}
+  {{ $key }}: |
+    {{- $value | nindent 4 }}
+  {{- else }}
+  {{ $key }}: {{ $value | quote }}
+  {{- end }}
+  {{- end }}
+{{- end }}

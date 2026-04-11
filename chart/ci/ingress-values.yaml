@@ -1,0 +1,22 @@
+# Ingress with all presets including Authentik
+image:
+  repository: ghcr.io/advplyr/audiobookshelf
+  tag: latest
+
+ports:
+  - name: http
+    containerPort: 80
+
+service:
+  main:
+    port: 80
+
+ingress:
+  main:
+    hostname: audiobookshelf.example.com
+    certManager: true
+    externalDns: true
+    authentik: true
+    proxyBodySize: "0"
+    annotations:
+      nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"

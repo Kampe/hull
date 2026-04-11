@@ -1,0 +1,45 @@
+# envFrom support for main, sidecar, and init container
+image:
+  repository: ghcr.io/example/app
+  tag: latest
+
+ports:
+  - name: http
+    containerPort: 8080
+
+configMaps:
+  app-env:
+    data:
+      APP_MODE: production
+
+envFrom:
+  - configMapRef:
+      name: app-env
+  - secretRef:
+      name: app-secrets
+
+env:
+  CONFIG_PATH:
+    configMapKeyRef:
+      name: app-env
+      key: APP_MODE
+
+sidecars:
+  worker:
+    image:
+      repository: busybox
+      tag: latest
+    command: ["sh", "-c", "sleep 3600"]
+    envFrom:
+      - secretRef:
+          name: worker-secrets
+
+initContainers:
+  setup:
+    image:
+      repository: busybox
+      tag: latest
+    command: ["sh", "-c", "echo init"]
+    envFrom:
+      - configMapRef:
+          name: app-env

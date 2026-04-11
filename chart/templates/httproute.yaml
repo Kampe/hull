@@ -1,0 +1,36 @@
+{{- $fullname := include "hull.fullname" . -}}
+{{- $labels := include "hull.labels" . -}}
+{{- range $name, $ing := .Values.ingress }}
+{{- if and $ing.hostname (eq ($.Values.routeType | default "ingress") "gateway") }}
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ if eq $name "main" }}{{ $fullname }}{{ else }}{{ $fullname }}-{{ $name }}{{ end }}
+  labels:
+    {{- $labels | nindent 4 }}
+  {{- with $ing.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  parentRefs:
+    - name: {{ $ing.gatewayName | default $.Values.gatewayName | default "main-gateway" }}
+      {{- if or $ing.gatewayNamespace $.Values.gatewayNamespace }}
+      namespace: {{ $ing.gatewayNamespace | default $.Values.gatewayNamespace }}
+      {{- end }}
+      {{- if or $ing.gatewaySectionName $.Values.gatewaySectionName }}
+      sectionName: {{ $ing.gatewaySectionName | default $.Values.gatewaySectionName | default "https" }}
+      {{- end }}
+  hostnames:
+    - {{ $ing.hostname | quote }}
+  rules:
+    - matches:
+        - path:
+            type: {{ $ing.pathType | default "PathPrefix" }}
+            value: {{ $ing.path | default "/" }}
+      backendRefs:
+        - name: {{ if and $ing.service (ne $ing.service "main") }}{{ $fullname }}-{{ $ing.service }}{{ else }}{{ $fullname }}{{ end }}
+          port: {{ $ing.servicePort | default (include "hull.servicePort" (dict "root" $ "serviceName" ($ing.service | default "main") "svcConfig" (index $.Values.service ($ing.service | default "main")))) }}
+{{- end }}
+{{- end }}

@@ -1,0 +1,443 @@
+# -- Hull: General-purpose Kubernetes application chart
+# -- Convention over configuration. No footguns.
+
+# -- Main container image
+image:
+  # -- Container image repository
+  repository: ""
+  # -- Container image tag
+  tag: ""
+  # -- Image pull policy
+  pullPolicy: IfNotPresent
+
+# -- Image pull secrets
+imagePullSecrets: []
+
+# -- Override the release name
+nameOverride: ""
+# -- Override the full release name
+fullnameOverride: ""
+
+# -- Workload type: Deployment (default) or StatefulSet
+workloadType: Deployment
+
+# -- Number of replicas
+replicas: 1
+
+# -- Revision history limit (number of old ReplicaSets to retain)
+# -- Set low for GitOps clusters where rollback is via git revert
+revisionHistoryLimit: null
+
+# -- Deployment strategy (Deployment) or update strategy (StatefulSet)
+# -- Examples:
+# --   strategy:
+# --     type: Recreate
+# --   strategy:
+# --     type: RollingUpdate
+# --     rollingUpdate:
+# --       maxSurge: 1
+# --       maxUnavailable: 0
+strategy: {}
+
+# -- Restart policy for the pod (Always, OnFailure, Never)
+restartPolicy: Always
+
+# -- Main container command override
+command: []
+# -- Main container args override
+args: []
+
+# -- Environment variables for the main container
+# -- Supports plain values, secretKeyRef, and configMapKeyRef
+# -- Examples:
+# --   MY_VAR: "plain-value"
+# --   MY_SECRET:
+# --     secretKeyRef:
+# --       name: my-secret
+# --       key: password
+# --   MY_CONFIG:
+# --     configMapKeyRef:
+# --       name: my-configmap
+# --       key: setting
+env: {}
+
+# -- Bulk environment variable sources for the main container
+# -- Supports secretRef and configMapRef entries
+envFrom: []
+
+# -- Ports for the main container
+# -- Each entry: name, containerPort, protocol (default TCP)
+# -- If empty, no ports are exposed and no probes are generated
+ports: []
+  # - name: http
+  #   containerPort: 8080
+  #   protocol: TCP
+
+# -- Probe configuration for the main container
+# -- By default, probes are auto-generated from the first port:
+# --   - HTTP ports get httpGet probes on /
+# --   - Non-HTTP ports get tcpSocket probes
+# -- Set probes.enabled: false to disable all auto-probes
+# -- Override individual probes to customize
+probes:
+  # -- Global probe toggle (set false to disable all probes)
+  enabled: true
+  liveness:
+    # -- Set false to disable this specific probe
+    # enabled: true
+    # -- Probe type: auto (default), http, tcp, exec
+    # type: auto
+    # -- HTTP path (for http probes)
+    # path: /
+    # -- Port name or number (defaults to first port)
+    # port: http
+    # -- Custom exec command
+    # command: []
+    # initialDelaySeconds: 0
+    # periodSeconds: 10
+    # timeoutSeconds: 1
+    # failureThreshold: 3
+    # successThreshold: 1
+  readiness:
+    # Same options as liveness
+  startup:
+    # Same options as liveness, but with generous defaults:
+    # initialDelaySeconds: 0
+    # periodSeconds: 5
+    # timeoutSeconds: 1
+    # failureThreshold: 30
+    # successThreshold: 1
+
+# -- Resource requests and limits for the main container
+# -- Not set by default — user opts in
+resources: {}
+  # requests:
+  #   cpu: 100m
+  #   memory: 128Mi
+  # limits:
+  #   memory: 256Mi
+
+# -- Security context for the main container
+securityContext: {}
+
+# -- Lifecycle hooks for the main container
+lifecycle: {}
+
+# -- Volume mounts additional to those auto-wired from persistence
+volumeMounts: []
+
+# ---------------------------------------------------------------------------
+# Sidecar containers (run in the same pod as the main container)
+# ---------------------------------------------------------------------------
+sidecars: {}
+  # redis:
+  #   image:
+  #     repository: redis
+  #     tag: "7"
+  #   port: 6379
+  #   ports:
+  #     - name: redis
+  #       containerPort: 6379
+  #   env: {}
+  #   envFrom: []
+  #   command: []
+  #   args: []
+  #   probes:
+  #     enabled: true
+  #   resources: {}
+  #   securityContext: {}
+  #   lifecycle: {}
+  #   volumeMounts: []
+
+# -- Init containers
+initContainers: {}
+  # init-db:
+  #   image:
+  #     repository: busybox
+  #     tag: latest
+  #   command: ["sh", "-c", "echo init"]
+  #   env: {}
+  #   envFrom: []
+  #   resources: {}
+  #   securityContext: {}
+  #   volumeMounts: []
+
+# ---------------------------------------------------------------------------
+# Services
+# ---------------------------------------------------------------------------
+# -- Service definitions
+# -- By default, a "main" service is auto-generated from the main container's
+# -- first port. Define entries here to customize or add services.
+service:
+  main:
+    # -- Set false to disable this Service entirely
+    enabled: true
+    # -- Container whose ports this Service should target (default: main, or the service name for non-main services)
+    # targetContainer: main
+    # -- Port number for the main service (defaults to first container port)
+    port: null
+    # -- Target port name or number (defaults to the first port on the target container)
+    # targetPort: null
+    # -- Port name for single-port services
+    # name: http
+    # -- Service type: ClusterIP (default), LoadBalancer, NodePort
+    type: ClusterIP
+    # -- Protocol: TCP (default), UDP
+    protocol: TCP
+    # -- Multi-port Service definition
+    # ports:
+    #   http:
+    #     port: 8080
+    #     targetPort: http
+    #   grpc:
+    #     port: 9090
+    #     targetPort: grpc
+    # -- Additional service annotations
+    annotations: {}
+    # -- NodePort number (only for type: NodePort)
+    # nodePort: 30000
+    # -- LoadBalancer IP (only for type: LoadBalancer)
+    # loadBalancerIP: ""
+
+# ---------------------------------------------------------------------------
+# Routing (Ingress / Gateway API)
+# ---------------------------------------------------------------------------
+# -- Route type: "ingress" (default) or "gateway" (Gateway API HTTPRoute)
+routeType: ingress
+
+# -- Gateway API defaults (only used when routeType: gateway)
+# -- Name of the Gateway resource to attach HTTPRoutes to
+gatewayName: ""
+# -- Namespace of the Gateway (omit for same namespace)
+gatewayNamespace: ""
+# -- Section name on the Gateway listener (e.g., "https")
+gatewaySectionName: ""
+
+# -- Ingress / HTTPRoute definitions
+# -- The same block drives both Ingress and HTTPRoute depending on routeType
+ingress: {}
+  # main:
+  #   # -- Hostname (required)
+  #   hostname: ""
+  #   # -- Path (default: /)
+  #   path: /
+  #   # -- Path type: Prefix (Ingress default) / PathPrefix (Gateway default)
+  #   pathType: Prefix
+  #   # -- Ingress class name (default: nginx, only for routeType: ingress)
+  #   className: nginx
+  #   # -- Target service name (default: main)
+  #   service: main
+  #   # -- Target service port (defaults to the service's port)
+  #   servicePort: null
+  #   # -- Enable cert-manager TLS (adds vault-issuer annotation + TLS block, ingress only)
+  #   certManager: true
+  #   # -- Enable external-dns annotation (ingress only)
+  #   externalDns: true
+  #   # -- Enable Authentik forward-auth annotations (ingress only)
+  #   authentik: false
+  #   # -- Set nginx proxy-body-size (e.g., "100m", "0" for unlimited, ingress only)
+  #   proxyBodySize: ""
+  #   # -- Custom annotations (merged with generated ones)
+  #   annotations: {}
+  #   # -- Gateway API overrides (per-route, only for routeType: gateway)
+  #   # gatewayName: ""
+  #   # gatewayNamespace: ""
+  #   # gatewaySectionName: ""
+
+# ---------------------------------------------------------------------------
+# Persistence
+# ---------------------------------------------------------------------------
+persistence: {}
+  # data:
+  #   # -- Volume type: pvc (default), volumeClaimTemplate, emptyDir, nfs, configmap, secret, hostPath
+  #   type: pvc
+  #   # -- Mount path in the container (required)
+  #   mountPath: /data
+  #   # -- Sub-path within the volume
+  #   subPath: ""
+  #   # -- Read-only mount
+  #   readOnly: false
+  #   # -- List of container names to mount in (default: all)
+  #   containers: []
+  #
+  #   # PVC options:
+  #   size: 1Gi
+  #   accessMode: ReadWriteOnce
+  #   storageClass: ""
+  #   labels: {}
+  #   annotations: {}
+  #
+  #   # NFS options:
+  #   server: ""
+  #   path: ""
+  #
+  #   # ConfigMap options:
+  #   objectName: ""
+  #   items: []
+  #
+  #   # Secret options:
+  #   objectName: ""
+  #   items: []
+  #
+  #   # HostPath options:
+  #   hostPath: ""
+  #   hostPathType: ""
+
+# ---------------------------------------------------------------------------
+# ConfigMaps
+# ---------------------------------------------------------------------------
+configMaps: {}
+  # my-config:
+  #   data:
+  #     key: value
+  #     config.yml: |
+  #       setting: true
+
+# ---------------------------------------------------------------------------
+# Security
+# ---------------------------------------------------------------------------
+# -- Security preset: default, restricted, root
+# --   default: no security context applied (let the image decide)
+# --   restricted: drop ALL caps, readOnlyRootFilesystem, runAsNonRoot
+# --   root: runAsUser 0, runAsGroup 0
+securityPreset: default
+
+# -- Pod-level security context
+podSecurityContext: {}
+  # fsGroup: 1000
+  # fsGroupChangePolicy: OnRootMismatch
+
+# ---------------------------------------------------------------------------
+# Metrics / ServiceMonitor
+# ---------------------------------------------------------------------------
+metrics:
+  # -- Enable ServiceMonitor creation
+  enabled: false
+  # -- Port name to scrape (default: main service port name)
+  port: ""
+  # -- Metrics path
+  path: /metrics
+  # -- Scrape interval
+  interval: 30s
+  # -- Additional labels for the ServiceMonitor
+  labels: {}
+
+# ---------------------------------------------------------------------------
+# Service Account
+# ---------------------------------------------------------------------------
+serviceAccount:
+  # -- Create a service account
+  create: false
+  # -- Service account name (defaults to release name)
+  name: ""
+  # -- Annotations for the service account
+  annotations: {}
+
+# ---------------------------------------------------------------------------
+# RBAC
+# ---------------------------------------------------------------------------
+rbac:
+  # -- Create RBAC resources (requires serviceAccount.create: true)
+  create: false
+  # -- ClusterRole rules
+  rules: []
+    # - apiGroups: [""]
+    #   resources: ["pods"]
+    #   verbs: ["get", "list"]
+
+# ---------------------------------------------------------------------------
+# Network Policy
+# ---------------------------------------------------------------------------
+networkPolicy:
+  # -- Enable network policy
+  enabled: false
+  # -- Ingress rules (default: allow traffic on service ports)
+  ingress: []
+  # -- Egress rules (default: allow DNS + all egress)
+  egress: []
+
+# ---------------------------------------------------------------------------
+# Database
+# ---------------------------------------------------------------------------
+database: {}
+  # main:
+  #   type: cnpg  # cnpg, crossplane, external
+  #   database: myapp
+  #   user: myapp
+  #   instances: 2
+  #   storage:
+  #     size: 5Gi
+  #     storageClass: ""
+  #   walStorage:
+  #     size: 2Gi
+  #   resources: {}
+  #   monitoring:
+  #     enabled: false
+  #   backup:
+  #     schedule: "0 0 * * *"
+  #   pooler:
+  #     instances: 2
+  #     poolMode: session
+  #   env:
+  #     DATABASE_URL: uri
+  #     DATABASE_HOST: host
+  #     DATABASE_PASSWORD: password
+  #   injectIntoInitContainers: true
+  #   containers: []  # default: all containers
+  #
+  # analytics:
+  #   type: crossplane
+  #   claim:
+  #     apiVersion: database.example.org/v1alpha1
+  #     kind: PostgreSQLInstance
+  #   spec:
+  #     parameters:
+  #       storageGB: 20
+  #   env:
+  #     ANALYTICS_DB_URL: endpoint
+  #
+  # legacy:
+  #   type: external
+  #   secretName: legacy-db-credentials
+  #   env:
+  #     LEGACY_DB_HOST: host
+  #     LEGACY_DB_PASS: password
+
+# ---------------------------------------------------------------------------
+# Pod Spec
+# ---------------------------------------------------------------------------
+# -- Node selector
+nodeSelector: {}
+# -- Tolerations
+tolerations: []
+# -- Affinity rules
+affinity: {}
+# -- Topology spread constraints
+topologySpreadConstraints: []
+# -- DNS config
+dnsConfig: {}
+# -- DNS policy
+dnsPolicy: ""
+# -- Termination grace period
+terminationGracePeriodSeconds: 30
+# -- Annotations for the pod
+podAnnotations: {}
+# -- Labels for the pod
+podLabels: {}
+# -- Priority class name
+priorityClassName: ""
+# -- Host network mode
+hostNetwork: false
+
+# ---------------------------------------------------------------------------
+# Pod Disruption Budget
+# ---------------------------------------------------------------------------
+podDisruptionBudget:
+  # -- Enable PodDisruptionBudget creation
+  enabled: false
+  # -- Minimum available pods
+  # minAvailable: 1
+  # -- Maximum unavailable pods
+  # maxUnavailable: 1
+  labels: {}
+  annotations: {}

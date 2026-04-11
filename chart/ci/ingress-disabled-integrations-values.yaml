@@ -1,0 +1,17 @@
+image:
+  repository: nginx
+  tag: latest
+
+ports:
+  - name: http
+    containerPort: 8080
+
+service:
+  main:
+    port: 8080
+
+ingress:
+  main:
+    hostname: plain.example.com
+    certManager: false
+    externalDns: false

@@ -1,0 +1,48 @@
+# Multi-container with sidecars
+image:
+  repository: ghcr.io/karakeep-app/karakeep
+  tag: latest
+
+ports:
+  - name: http
+    containerPort: 3000
+
+sidecars:
+  chrome:
+    image:
+      repository: gcr.io/zenika-hub/alpine-chrome
+      tag: "124"
+    args: ["--no-sandbox", "--headless", "--remote-debugging-port=9222"]
+    port: 9222
+  meilisearch:
+    image:
+      repository: getmeili/meilisearch
+      tag: v1.13
+    port: 7700
+    env:
+      MEILI_NO_ANALYTICS: "true"
+
+env:
+  BROWSER_WEB_URL: "http://localhost:9222"
+  MEILI_ADDR: "http://localhost:7700"
+
+service:
+  main:
+    port: 3000
+
+ingress:
+  main:
+    hostname: bookmarks.example.com
+    certManager: true
+    externalDns: true
+
+persistence:
+  data:
+    size: 5Gi
+    mountPath: /data
+  meili:
+    size: 2Gi
+    mountPath: /meili_data
+    containers: [meilisearch]
+
+securityPreset: root

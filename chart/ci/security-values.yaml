@@ -1,0 +1,36 @@
+# Security presets and RBAC
+image:
+  repository: nginx
+  tag: latest
+
+ports:
+  - name: http
+    containerPort: 8080
+
+service:
+  main:
+    port: 8080
+
+securityPreset: restricted
+
+podSecurityContext:
+  fsGroup: 1000
+  fsGroupChangePolicy: OnRootMismatch
+
+serviceAccount:
+  create: true
+  annotations:
+    eks.amazonaws.com/role-arn: "arn:aws:iam::role/test"
+
+rbac:
+  create: true
+  rules:
+    - apiGroups: [""]
+      resources: ["pods"]
+      verbs: ["get", "list"]
+    - apiGroups: [""]
+      resources: ["configmaps"]
+      verbs: ["get"]
+
+networkPolicy:
+  enabled: true

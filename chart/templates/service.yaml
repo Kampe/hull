@@ -1,0 +1,44 @@
+{{- $fullname := include "hull.fullname" . -}}
+{{- $labels := include "hull.labels" . -}}
+{{- $selectorLabels := include "hull.selectorLabels" . -}}
+{{- range $svcName, $svcConfig := .Values.service }}
+{{- $enabled := true -}}
+{{- if hasKey $svcConfig "enabled" }}
+{{- $enabled = $svcConfig.enabled -}}
+{{- end }}
+{{- $renderedPorts := include "hull.servicePorts" (dict "root" $ "serviceName" $svcName "svcConfig" $svcConfig) | trim -}}
+{{- if and $enabled $renderedPorts }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ if eq $svcName "main" }}{{ $fullname }}{{ else }}{{ $fullname }}-{{ $svcName }}{{ end }}
+  labels:
+    {{- $labels | nindent 4 }}
+  {{- with $svcConfig.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ $svcConfig.type | default "ClusterIP" }}
+  {{- if and (eq ($svcConfig.type | default "ClusterIP") "LoadBalancer") $svcConfig.loadBalancerIP }}
+  loadBalancerIP: {{ $svcConfig.loadBalancerIP }}
+  {{- end }}
+  selector:
+    {{- $selectorLabels | nindent 4 }}
+  ports:
+    {{- $ports := $renderedPorts | fromYamlArray }}
+    {{- range $ports }}
+    - name: {{ .name }}
+      port: {{ .port }}
+      targetPort: {{ .targetPort }}
+      protocol: {{ .protocol }}
+      {{- if .appProtocol }}
+      appProtocol: {{ .appProtocol }}
+      {{- end }}
+      {{- if and (eq ($svcConfig.type | default "ClusterIP") "NodePort") .nodePort }}
+      nodePort: {{ .nodePort }}
+      {{- end }}
+    {{- end }}
+{{- end }}
+{{- end }}

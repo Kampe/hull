@@ -1,0 +1,30 @@
+{{- $fullname := include "hull.fullname" . -}}
+{{- $labels := include "hull.labels" . -}}
+{{- range $name, $vol := .Values.persistence }}
+{{- $type := $vol.type | default "pvc" }}
+{{- if eq $type "pvc" }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ $fullname }}-{{ $name }}
+  labels:
+    {{- $labels | nindent 4 }}
+    {{- with $vol.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- with $vol.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  accessModes:
+    - {{ $vol.accessMode | default "ReadWriteOnce" }}
+  {{- if $vol.storageClass }}
+  storageClassName: {{ $vol.storageClass }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ $vol.size | default "1Gi" }}
+{{- end }}
+{{- end }}
