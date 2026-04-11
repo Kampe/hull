@@ -1,16 +1,36 @@
-# Hull
+<div align="center">
 
-A general-purpose Helm chart for deploying applications to Kubernetes. One chart to rule them all.
+<img src=".github/icon.svg" alt="" width="96" height="96">
+
+<h1>Hull</h1>
+
+[![CI](https://github.com/Kampe/hull/actions/workflows/ci.yaml/badge.svg)](https://github.com/Kampe/hull/actions/workflows/ci.yaml)
+[![Helm](https://img.shields.io/badge/Helm-0.1.0-blue?logo=helm)](https://github.com/Kampe/hull)
+[![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
+
+**A general-purpose Helm chart for deploying applications to Kubernetes.**
+**One chart to rule them all.**
+
+</div>
+
+<br>
 
 Hull replaces the need for hundreds of app-specific charts. It's designed for GitOps-managed homelabs and production clusters where you want **convention over configuration** without the footguns.
 
+> **8 lines of YAML** to deploy an app with a Service, Ingress, TLS, DNS, and auto-probes.
+> Zero hidden env vars. Zero hidden volume mounts. Zero surprise security contexts.
+
+---
+
 ## Philosophy
 
-1. **Convention over configuration** — sane defaults that work for 90% of apps with zero overrides
-2. **No footguns** — never silently break a deployment with hidden defaults
-3. **Explicit is better than implicit** — if a feature is enabled, the user asked for it
-4. **Multi-container first class** — sidecars are as easy as the main container
-5. **GitOps native** — everything is declarative YAML, no imperative setup steps
+| | Principle |
+|---|---|
+| **1** | **Convention over configuration** — sane defaults that work for 90% of apps with zero overrides |
+| **2** | **No footguns** — never silently break a deployment with hidden defaults |
+| **3** | **Explicit is better than implicit** — if a feature is enabled, the user asked for it |
+| **4** | **Multi-container first class** — sidecars are as easy as the main container |
+| **5** | **GitOps native** — everything is declarative YAML, no imperative setup steps |
 
 ## Quick Start
 
