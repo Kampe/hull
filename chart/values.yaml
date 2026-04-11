@@ -200,6 +200,15 @@ service:
     # loadBalancerIP: ""
 
 # ---------------------------------------------------------------------------
+# Global Defaults
+# ---------------------------------------------------------------------------
+global:
+  # -- Default cert-manager ClusterIssuer name for ingress TLS
+  clusterIssuer: vault-issuer
+  # -- Authentik outpost URL (used when ingress.*.authentik: true)
+  authentikOutpost: "http://ak-outpost-authentik-embedded-outpost.authentik.svc.cluster.local:9000"
+
+# ---------------------------------------------------------------------------
 # Routing (Ingress / Gateway API)
 # ---------------------------------------------------------------------------
 # -- Route type: "ingress" (default) or "gateway" (Gateway API HTTPRoute)
@@ -229,7 +238,7 @@ ingress: {}
   #   service: main
   #   # -- Target service port (defaults to the service's port)
   #   servicePort: null
-  #   # -- Enable cert-manager TLS (adds vault-issuer annotation + TLS block, ingress only)
+  #   # -- Enable cert-manager TLS (adds cluster-issuer annotation + TLS block, ingress only)
   #   certManager: true
   #   # -- Enable external-dns annotation (ingress only)
   #   externalDns: true
@@ -264,6 +273,7 @@ persistence: {}
   #   size: 1Gi
   #   accessMode: ReadWriteOnce
   #   storageClass: ""
+  #   existingClaim: ""  # Use a pre-existing PVC instead of creating one (for migrations)
   #   labels: {}
   #   annotations: {}
   #

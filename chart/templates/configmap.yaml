@@ -10,11 +10,16 @@ metadata:
     {{- $labels | nindent 4 }}
 data:
   {{- range $key, $value := $cm.data }}
-  {{- if contains "\n" ($value | toString) }}
+  {{- if kindIs "string" $value }}
+  {{- if contains "\n" $value }}
   {{ $key }}: |
     {{- $value | nindent 4 }}
   {{- else }}
   {{ $key }}: {{ $value | quote }}
+  {{- end }}
+  {{- else }}
+  {{ $key }}: |
+    {{- toYaml $value | nindent 4 }}
   {{- end }}
   {{- end }}
 {{- end }}

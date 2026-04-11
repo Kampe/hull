@@ -2,7 +2,7 @@
 {{- $labels := include "hull.labels" . -}}
 {{- range $name, $vol := .Values.persistence }}
 {{- $type := $vol.type | default "pvc" }}
-{{- if eq $type "pvc" }}
+{{- if and (eq $type "pvc") (not $vol.existingClaim) }}
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim

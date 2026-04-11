@@ -309,7 +309,7 @@ Accepts a dict:
 - name: {{ $name }}
   {{- if eq $type "pvc" }}
   persistentVolumeClaim:
-    claimName: {{ $fullname }}-{{ $name }}
+    claimName: {{ $vol.existingClaim | default (printf "%s-%s" $fullname $name) }}
   {{- else if eq $type "emptyDir" }}
   emptyDir:
     {{- if $vol.medium }}
@@ -390,17 +390,18 @@ Generate StatefulSet volumeClaimTemplates from persistence config.
 
 {{/*
 Generate Authentik forward-auth annotations for nginx ingress.
-Accepts the hostname string.
+Accepts a dict with "hostname" and "outpost" keys.
 */}}
 {{- define "hull.authentikAnnotations" -}}
-nginx.ingress.kubernetes.io/auth-url: "http://ak-outpost-authentik-embedded-outpost.authentik.svc.cluster.local:9000/outpost.goauthentik.io/auth/nginx"
-nginx.ingress.kubernetes.io/auth-signin: "https://{{ . }}/outpost.goauthentik.io/start?rd=$escaped_request_uri"
+{{- $outpost := .outpost | default "http://ak-outpost-authentik-embedded-outpost.authentik.svc.cluster.local:9000" -}}
+nginx.ingress.kubernetes.io/auth-url: "{{ $outpost }}/outpost.goauthentik.io/auth/nginx"
+nginx.ingress.kubernetes.io/auth-signin: "https://{{ .hostname }}/outpost.goauthentik.io/start?rd=$escaped_request_uri"
 nginx.ingress.kubernetes.io/auth-response-headers: "Set-Cookie,X-authentik-username,X-authentik-groups,X-authentik-email,X-authentik-name,X-authentik-uid"
 nginx.ingress.kubernetes.io/auth-snippet: |
   proxy_set_header X-Forwarded-Host $http_host;
 nginx.ingress.kubernetes.io/server-snippet: |
   location /outpost.goauthentik.io {
-    proxy_pass http://ak-outpost-authentik-embedded-outpost.authentik.svc.cluster.local:9000/outpost.goauthentik.io;
+    proxy_pass {{ $outpost }}/outpost.goauthentik.io;
     proxy_set_header Host $host;
     proxy_set_header X-Original-URL $scheme://$http_host$request_uri;
   }
@@ -410,13 +411,13 @@ nginx.ingress.kubernetes.io/server-snippet: |
 Resolve the target container for a service entry.
 */}}
 {{- define "hull.serviceTargetContainer" -}}
-{{- if .svcConfig.targetContainer }}
-{{- .svcConfig.targetContainer }}
-{{- else if eq .serviceName "main" }}
+{{- if .svcConfig.targetContainer -}}
+{{- .svcConfig.targetContainer -}}
+{{- else if eq .serviceName "main" -}}
 main
-{{- else }}
-{{- .serviceName }}
-{{- end }}
+{{- else -}}
+{{- .serviceName -}}
+{{- end -}}
 {{- end }}
 
 {{/*
@@ -493,22 +494,15 @@ Outputs YAML list directly — avoids Helm 4 scoping issues with $var reassignme
 {{- $root := .root -}}
 {{- $svcConfig := .svcConfig -}}
 {{- $mainPorts := $root.Values.ports | default list -}}
-{{- if gt (len $mainPorts) 0 }}
-{{- $first := index $mainPorts 0 -}}
-{{- $pName := (index $first "name" | default "") -}}
-{{- $pNum := index $first "containerPort" -}}
-{{- $pProto := (index $first "protocol" | default "TCP") -}}
-{{- $servicePort := $svcConfig.port | default $pNum -}}
-{{- $targetPort := $svcConfig.targetPort | default ($pName | default $pNum) -}}
-{{- $portName := $svcConfig.name | default ($pName | default "http") -}}
-{{- $item := dict "name" $portName "port" $servicePort "targetPort" $targetPort "protocol" ($svcConfig.protocol | default $pProto) -}}
-{{- if $svcConfig.nodePort }}{{- $item = merge $item (dict "nodePort" $svcConfig.nodePort) }}{{- end }}
-{{- toYaml (list $item) }}
-{{- else if $svcConfig.port }}
-{{- $item := dict "name" ($svcConfig.name | default "http") "port" $svcConfig.port "targetPort" ($svcConfig.targetPort | default $svcConfig.port) "protocol" ($svcConfig.protocol | default "TCP") -}}
-{{- if $svcConfig.nodePort }}{{- $item = merge $item (dict "nodePort" $svcConfig.nodePort) }}{{- end }}
-{{- toYaml (list $item) }}
-{{- end }}
+{{- if gt (len $mainPorts) 0 -}}
+{{- $servicePort := $svcConfig.port | default (index $mainPorts 0).containerPort -}}
+{{- $portName := $svcConfig.name | default ((index $mainPorts 0).name | default "http") -}}
+{{- $targetPort := $svcConfig.targetPort | default ((index $mainPorts 0).name | default (index $mainPorts 0).containerPort) -}}
+{{- $protocol := $svcConfig.protocol | default ((index $mainPorts 0).protocol | default "TCP") -}}
+{{- toYaml (list (dict "name" $portName "port" $servicePort "targetPort" $targetPort "protocol" $protocol)) }}
+{{- else if $svcConfig.port -}}
+{{- toYaml (list (dict "name" ($svcConfig.name | default "http") "port" $svcConfig.port "targetPort" ($svcConfig.targetPort | default $svcConfig.port) "protocol" ($svcConfig.protocol | default "TCP"))) }}
+{{- end -}}
 {{- end }}
 
 {{- define "hull.servicePortsSingleSidecar" -}}

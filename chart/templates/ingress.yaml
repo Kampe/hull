@@ -12,7 +12,7 @@ metadata:
   annotations:
     {{- /* cert-manager */ -}}
     {{- if ne ($ing.certManager | toString) "false" }}
-    cert-manager.io/cluster-issuer: {{ $ing.clusterIssuer | default "vault-issuer" }}
+    cert-manager.io/cluster-issuer: {{ $ing.clusterIssuer | default $.Values.global.clusterIssuer | default "vault-issuer" }}
     {{- end }}
     {{- /* external-dns */ -}}
     {{- if ne ($ing.externalDns | toString) "false" }}
@@ -20,7 +20,7 @@ metadata:
     {{- end }}
     {{- /* Authentik forward-auth */ -}}
     {{- if $ing.authentik }}
-    {{- include "hull.authentikAnnotations" $ing.hostname | nindent 4 }}
+    {{- include "hull.authentikAnnotations" (dict "hostname" $ing.hostname "outpost" $.Values.global.authentikOutpost) | nindent 4 }}
     {{- end }}
     {{- /* proxy-body-size */ -}}
     {{- if $ing.proxyBodySize }}

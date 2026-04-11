@@ -62,6 +62,14 @@
       "type": "object",
       "additionalProperties": { "$ref": "#/$defs/service" }
     },
+    "global": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "clusterIssuer": { "type": "string" },
+        "authentikOutpost": { "type": "string" }
+      }
+    },
     "routeType": { "type": "string", "enum": ["ingress", "gateway"] },
     "gatewayName": { "type": "string" },
     "gatewayNamespace": { "type": "string" },
@@ -404,6 +412,7 @@
         "size": { "type": "string" },
         "accessMode": { "type": "string" },
         "storageClass": { "type": "string" },
+        "existingClaim": { "type": "string" },
         "labels": { "type": "object" },
         "annotations": { "type": "object" },
         "server": { "type": "string" },

@@ -5,7 +5,7 @@
 <h1>Hull</h1>
 
 [![CI](https://github.com/Kampe/hull/actions/workflows/ci.yaml/badge.svg)](https://github.com/Kampe/hull/actions/workflows/ci.yaml)
-[![Helm](https://img.shields.io/badge/Helm-0.1.0-blue?logo=helm)](https://github.com/Kampe/hull)
+[![Helm](https://img.shields.io/badge/Helm-1.0.0-blue?logo=helm)](https://github.com/Kampe/hull)
 [![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
 
 **A general-purpose Helm chart for deploying applications to Kubernetes.**
@@ -37,7 +37,7 @@ Hull replaces the need for hundreds of app-specific charts. It's designed for Gi
 ### Install from OCI Registry
 
 ```bash
-helm install my-app oci://ghcr.io/kampe/hull --version 0.1.0 -f values.yaml
+helm install my-app oci://ghcr.io/kampe/hull --version 1.0.0 -f values.yaml
 ```
 
 ### Minimal Deployment (8 lines)
@@ -227,7 +227,7 @@ ingress:
 ingress:
   main:
     hostname: app.example.com
-    clusterIssuer: letsencrypt-prod  # default: vault-issuer
+    clusterIssuer: vault-issuer  # default: vault-issuer
 ```
 
 **Disable cert-manager or external-dns:**
@@ -706,7 +706,7 @@ spec:
   source:
     chart: hull
     repoURL: ghcr.io/kampe
-    targetRevision: 0.1.0
+    targetRevision: 1.0.0
     helm:
       valuesObject:
         image:

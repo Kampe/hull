@@ -2,7 +2,7 @@ apiVersion: v2
 name: hull
 description: A general-purpose Helm chart for deploying applications to Kubernetes. Convention over configuration, no footguns.
 type: application
-version: 0.1.0
+version: 1.0.0
 appVersion: "1.0.0"
 keywords:
   - app-template
