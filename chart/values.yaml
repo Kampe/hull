@@ -95,7 +95,7 @@ probes:
     # command: []
     # initialDelaySeconds: 0
     # periodSeconds: 10
-    # timeoutSeconds: 1
+    # timeoutSeconds: 5
     # failureThreshold: 3
     # successThreshold: 1
   readiness:
@@ -104,7 +104,7 @@ probes:
     # Same options as liveness, but with generous defaults:
     # initialDelaySeconds: 0
     # periodSeconds: 5
-    # timeoutSeconds: 1
+    # timeoutSeconds: 5
     # failureThreshold: 30
     # successThreshold: 1
 

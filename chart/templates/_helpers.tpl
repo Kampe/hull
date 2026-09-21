@@ -208,7 +208,7 @@ tcpSocket:
 {{- end }}
 initialDelaySeconds: {{ $cfg.initialDelaySeconds | default 0 }}
 periodSeconds: {{ $cfg.periodSeconds | default (ternary 5 10 $isStartup) }}
-timeoutSeconds: {{ $cfg.timeoutSeconds | default 1 }}
+timeoutSeconds: {{ $cfg.timeoutSeconds | default 5 }}
 failureThreshold: {{ $cfg.failureThreshold | default (ternary 30 3 $isStartup) }}
 successThreshold: {{ $cfg.successThreshold | default 1 }}
 {{- end }}
