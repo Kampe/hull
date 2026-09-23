@@ -1,0 +1,20 @@
+image:
+  repository: ghcr.io/restic/restic
+  tag: "0.17.3"
+workloadType: CronJob
+command: ["/bin/sh", "-c"]
+args: ["restic backup /data"]
+cronJob:
+  schedule: "0 3 * * *"
+  timeZone: America/Chicago
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+  startingDeadlineSeconds: 300
+job:
+  backoffLimit: 2
+  ttlSecondsAfterFinished: 86400
+persistence:
+  data:
+    mountPath: /data
+    size: 20Gi

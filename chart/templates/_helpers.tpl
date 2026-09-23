@@ -617,3 +617,344 @@ Accepts a dict:
 {{- end -}}
 {{- end -}}
 {{- end }}
+
+{{/*
+Pod template shared by every workload kind.
+
+Extracted so Deployment, StatefulSet, DaemonSet, Job and CronJob render one
+identical pod spec instead of four drifting copies. Emitted at indent 0; the
+caller nindents it (2 for the apps/v1 kinds and Job, 6 under CronJob
+jobTemplate). Scope variables the block needs are recomputed here because a
+define does not inherit the caller's $vars.
+*/}}
+{{- define "hull.podTemplate" -}}
+{{- $fullname := include "hull.fullname" . -}}
+{{- $selectorLabels := include "hull.selectorLabels" . -}}
+{{- $kind := .Values.workloadType | default "Deployment" -}}
+template:
+  metadata:
+    labels:
+      {{- $selectorLabels | nindent 6 }}
+      {{- with .Values.podLabels }}
+      {{- toYaml . | nindent 6 }}
+      {{- end }}
+    {{- if or .Values.podAnnotations .Values.configMaps }}
+    annotations:
+      {{- /* Roll the pods whenever a chart-rendered ConfigMap changes; without
+           this a config-only edit needs a manual rollout restart. */}}
+      {{- with .Values.configMaps }}
+      checksum/configmaps: {{ toYaml . | sha256sum }}
+      {{- end }}
+      {{- with .Values.podAnnotations }}
+      {{- toYaml . | nindent 6 }}
+      {{- end }}
+    {{- end }}
+  spec:
+    {{- with .Values.imagePullSecrets }}
+    imagePullSecrets:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+    {{- if or .Values.serviceAccount.create .Values.serviceAccount.name }}
+    serviceAccountName: {{ include "hull.serviceAccountName" . }}
+    {{- end }}
+    {{- if .Values.priorityClassName }}
+    priorityClassName: {{ .Values.priorityClassName }}
+    {{- end }}
+    {{- if .Values.hostNetwork }}
+    hostNetwork: true
+    {{- end }}
+    {{- if .Values.dnsPolicy }}
+    dnsPolicy: {{ .Values.dnsPolicy }}
+    {{- end }}
+    {{- with .Values.dnsConfig }}
+    dnsConfig:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+    terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds | default 30 }}
+    {{- /* Kubernetes rejects restartPolicy Always on Job and CronJob pods.
+         values.yaml carries Always as the chart-wide default, so `default`
+         cannot tell "chart default" from "user asked for Always" -- and since
+         Always is invalid for batch kinds either way, coerce it to OnFailure
+         rather than render a manifest the API server will refuse. An explicit
+         Never or OnFailure is still honoured. */}}
+    {{- $restartPolicy := .Values.restartPolicy | default "Always" -}}
+    {{- if and (has $kind (list "Job" "CronJob")) (eq $restartPolicy "Always") -}}
+    {{- $restartPolicy = "OnFailure" -}}
+    {{- end }}
+    restartPolicy: {{ $restartPolicy }}
+    {{- /* Pod security context */ -}}
+    {{- $podSec := .Values.podSecurityContext | default dict }}
+    {{- $preset := .Values.securityPreset | default "default" }}
+    {{- if ne (len $podSec) 0 }}
+    securityContext:
+      {{- toYaml $podSec | nindent 6 }}
+    {{- end }}
+    {{- /* Init containers */ -}}
+    {{- if .Values.initContainers }}
+    initContainers:
+      {{- range $name, $init := .Values.initContainers }}
+      - name: {{ $name }}
+        image: {{ include "hull.image" $init.image }}
+        imagePullPolicy: {{ $init.image.pullPolicy | default "IfNotPresent" }}
+        {{- with $init.command }}
+        command:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        {{- with $init.args }}
+        args:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        {{- $initDbEnv := include "hull.databaseEnv" (dict "databases" $.Values.database "containerName" $name "fullname" $fullname "isInitContainer" true) | trim }}
+        {{- if or $init.env $initDbEnv }}
+        env:
+          {{- if $init.env }}
+          {{- include "hull.env" (dict "env" $init.env "root" $ "fullname" $fullname) | trim | nindent 10 }}
+          {{- end }}
+          {{- if $initDbEnv }}
+          {{- $initDbEnv | nindent 10 }}
+          {{- end }}
+        {{- end }}
+        {{- if $init.envFrom }}
+        envFrom:
+          {{- include "hull.envFrom" (dict "envFrom" $init.envFrom "root" $ "fullname" $fullname) | trim | nindent 10 }}
+        {{- end }}
+        {{- with $init.resources }}
+        resources:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        {{- with $init.securityContext }}
+        securityContext:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        {{- $initMounts := include "hull.volumeMounts" (dict "persistence" $.Values.persistence "containerName" $name "fullname" $fullname) }}
+        {{- $extraMounts := $init.volumeMounts | default list }}
+        {{- if or $initMounts $extraMounts }}
+        volumeMounts:
+          {{- if $initMounts }}
+          {{- $initMounts | trim | nindent 10 }}
+          {{- end }}
+          {{- range $extraMounts }}
+          - {{ toYaml . | nindent 12 | trim }}
+          {{- end }}
+        {{- end }}
+      {{- end }}
+    {{- end }}
+    containers:
+      - name: main
+        image: {{ include "hull.image" .Values.image }}
+        imagePullPolicy: {{ .Values.image.pullPolicy | default "IfNotPresent" }}
+        {{- with .Values.command }}
+        command:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        {{- with .Values.args }}
+        args:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        {{- $mainDbEnv := include "hull.databaseEnv" (dict "databases" .Values.database "containerName" "main" "fullname" $fullname) | trim }}
+        {{- if or .Values.env $mainDbEnv }}
+        env:
+          {{- if .Values.env }}
+          {{- include "hull.env" (dict "env" .Values.env "root" . "fullname" $fullname) | trim | nindent 10 }}
+          {{- end }}
+          {{- if $mainDbEnv }}
+          {{- $mainDbEnv | nindent 10 }}
+          {{- end }}
+        {{- end }}
+        {{- if .Values.envFrom }}
+        envFrom:
+          {{- include "hull.envFrom" (dict "envFrom" .Values.envFrom "root" . "fullname" $fullname) | trim | nindent 10 }}
+        {{- end }}
+        {{- if .Values.ports }}
+        ports:
+          {{- range .Values.ports }}
+          - name: {{ .name | default "http" }}
+            containerPort: {{ .containerPort }}
+            protocol: {{ .protocol | default "TCP" }}
+          {{- end }}
+        {{- end }}
+        {{- /* Probes */ -}}
+        {{- $probesEnabled := true }}
+        {{- if hasKey .Values.probes "enabled" }}
+        {{- $probesEnabled = .Values.probes.enabled }}
+        {{- end }}
+        {{- $firstPort := dict }}
+        {{- if .Values.ports }}
+        {{- $firstPort = index .Values.ports 0 }}
+        {{- end }}
+        {{- if and $probesEnabled $firstPort }}
+        {{- $livenessProbe := include "hull.probe" (dict "probeConfig" .Values.probes.liveness "port" $firstPort "isStartup" false) | trim }}
+        {{- if $livenessProbe }}
+        livenessProbe:
+          {{- $livenessProbe | nindent 10 }}
+        {{- end }}
+        {{- $readinessProbe := include "hull.probe" (dict "probeConfig" .Values.probes.readiness "port" $firstPort "isStartup" false) | trim }}
+        {{- if $readinessProbe }}
+        readinessProbe:
+          {{- $readinessProbe | nindent 10 }}
+        {{- end }}
+        {{- $startupProbe := include "hull.probe" (dict "probeConfig" .Values.probes.startup "port" $firstPort "isStartup" true) | trim }}
+        {{- if $startupProbe }}
+        startupProbe:
+          {{- $startupProbe | nindent 10 }}
+        {{- end }}
+        {{- end }}
+        {{- with .Values.resources }}
+        resources:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        {{- $mainSec := include "hull.containerSecurityContext" (dict "preset" $preset "securityContext" .Values.securityContext) }}
+        {{- if $mainSec }}
+        securityContext:
+          {{- $mainSec | nindent 10 }}
+        {{- end }}
+        {{- with .Values.lifecycle }}
+        lifecycle:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        {{- $mainMounts := include "hull.volumeMounts" (dict "persistence" .Values.persistence "containerName" "main" "fullname" $fullname) }}
+        {{- $extraMounts := .Values.volumeMounts | default list }}
+        {{- if or $mainMounts $extraMounts }}
+        volumeMounts:
+          {{- if $mainMounts }}
+          {{- $mainMounts | trim | nindent 10 }}
+          {{- end }}
+          {{- range $extraMounts }}
+          - {{ toYaml . | nindent 12 | trim }}
+          {{- end }}
+        {{- end }}
+      {{- /* ---- Sidecar containers ---- */ -}}
+      {{- range $name, $sidecar := .Values.sidecars }}
+      - name: {{ $name }}
+        image: {{ include "hull.image" $sidecar.image }}
+        imagePullPolicy: {{ $sidecar.image.pullPolicy | default "IfNotPresent" }}
+        {{- with $sidecar.command }}
+        command:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        {{- with $sidecar.args }}
+        args:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        {{- $sidecarDbEnv := include "hull.databaseEnv" (dict "databases" $.Values.database "containerName" $name "fullname" $fullname) | trim }}
+        {{- if or $sidecar.env $sidecarDbEnv }}
+        env:
+          {{- if $sidecar.env }}
+          {{- include "hull.env" (dict "env" $sidecar.env "root" $ "fullname" $fullname) | trim | nindent 10 }}
+          {{- end }}
+          {{- if $sidecarDbEnv }}
+          {{- $sidecarDbEnv | nindent 10 }}
+          {{- end }}
+        {{- end }}
+        {{- if $sidecar.envFrom }}
+        envFrom:
+          {{- include "hull.envFrom" (dict "envFrom" $sidecar.envFrom "root" $ "fullname" $fullname) | trim | nindent 10 }}
+        {{- end }}
+        {{- /* Sidecar ports: support single port shorthand or full ports list */ -}}
+        {{- $sidecarPorts := include "hull.containerPorts" (dict "root" $ "containerName" $name) | fromYamlArray | default list }}
+        {{- if $sidecarPorts }}
+        ports:
+          {{- range $sidecarPorts }}
+          - name: {{ .name | default $name }}
+            containerPort: {{ .containerPort }}
+            protocol: {{ .protocol | default "TCP" }}
+          {{- end }}
+        {{- end }}
+        {{- /* Sidecar probes */ -}}
+        {{- $sProbesEnabled := true }}
+        {{- $sProbes := $sidecar.probes | default dict }}
+        {{- if hasKey $sProbes "enabled" }}
+        {{- $sProbesEnabled = $sProbes.enabled }}
+        {{- end }}
+        {{- $sFirstPort := dict }}
+        {{- if $sidecarPorts }}
+        {{- $sFirstPort = index $sidecarPorts 0 }}
+        {{- end }}
+        {{- if and $sProbesEnabled $sFirstPort }}
+        {{- $sLiveness := include "hull.probe" (dict "probeConfig" $sProbes.liveness "port" $sFirstPort "isStartup" false) | trim }}
+        {{- if $sLiveness }}
+        livenessProbe:
+          {{- $sLiveness | nindent 10 }}
+        {{- end }}
+        {{- $sReadiness := include "hull.probe" (dict "probeConfig" $sProbes.readiness "port" $sFirstPort "isStartup" false) | trim }}
+        {{- if $sReadiness }}
+        readinessProbe:
+          {{- $sReadiness | nindent 10 }}
+        {{- end }}
+        {{- $sStartup := include "hull.probe" (dict "probeConfig" $sProbes.startup "port" $sFirstPort "isStartup" true) | trim }}
+        {{- if $sStartup }}
+        startupProbe:
+          {{- $sStartup | nindent 10 }}
+        {{- end }}
+        {{- end }}
+        {{- with $sidecar.resources }}
+        resources:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        {{- $sSec := include "hull.containerSecurityContext" (dict "preset" $preset "securityContext" $sidecar.securityContext) }}
+        {{- if $sSec }}
+        securityContext:
+          {{- $sSec | nindent 10 }}
+        {{- end }}
+        {{- with $sidecar.lifecycle }}
+        lifecycle:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        {{- $sMounts := include "hull.volumeMounts" (dict "persistence" $.Values.persistence "containerName" $name "fullname" $fullname) }}
+        {{- $sExtraMounts := $sidecar.volumeMounts | default list }}
+        {{- if or $sMounts $sExtraMounts }}
+        volumeMounts:
+          {{- if $sMounts }}
+          {{- $sMounts | trim | nindent 10 }}
+          {{- end }}
+          {{- range $sExtraMounts }}
+          - {{ toYaml . | nindent 12 | trim }}
+          {{- end }}
+        {{- end }}
+      {{- end }}
+    {{- $volumes := include "hull.volumes" (dict "persistence" .Values.persistence "fullname" $fullname) | trim }}
+    {{- if $volumes }}
+    volumes:
+      {{- $volumes | nindent 6 }}
+    {{- end }}
+    {{- with .Values.nodeSelector }}
+    nodeSelector:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+    {{- with .Values.affinity }}
+    affinity:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+    {{- with .Values.tolerations }}
+    tolerations:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+    {{- with .Values.topologySpreadConstraints }}
+    topologySpreadConstraints:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+{{- end }}
+
+{{/*
+Job spec fields shared by workloadType Job and CronJob's jobTemplate.
+Emitted at indent 0; the caller nindents (2 for Job, 6 under jobTemplate).
+*/}}
+{{- define "hull.jobSpecFields" -}}
+{{- $job := .Values.job | default dict -}}
+{{- if not (kindIs "invalid" $job.backoffLimit) }}
+backoffLimit: {{ $job.backoffLimit }}
+{{- end }}
+{{- if not (kindIs "invalid" $job.completions) }}
+completions: {{ $job.completions }}
+{{- end }}
+{{- if not (kindIs "invalid" $job.parallelism) }}
+parallelism: {{ $job.parallelism }}
+{{- end }}
+{{- if not (kindIs "invalid" $job.activeDeadlineSeconds) }}
+activeDeadlineSeconds: {{ $job.activeDeadlineSeconds }}
+{{- end }}
+{{- if not (kindIs "invalid" $job.ttlSecondsAfterFinished) }}
+ttlSecondsAfterFinished: {{ $job.ttlSecondsAfterFinished }}
+{{- end }}
+{{- end }}
+

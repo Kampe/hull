@@ -695,6 +695,108 @@ assert "Schema: accepts named ingress ports and integer metrics ports" \
 # ============================================================================
 # Summary
 # ============================================================================
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Workload kinds: DaemonSet / Job / CronJob
+# ─────────────────────────────────────────────────────────────────────────────
+printf "\n${YELLOW}━━━ Workload Kinds (DaemonSet / Job / CronJob) ━━━${NC}\n"
+
+BASE="--set image.repository=nginx --set image.tag=1"
+
+OUTPUT=$(render $BASE --set workloadType=DaemonSet)
+assert_contains "DaemonSet: correct kind" "$OUTPUT" "kind: DaemonSet"
+assert_contains "DaemonSet: apps/v1" "$OUTPUT" "apiVersion: apps/v1"
+assert_not_contains "DaemonSet: no replicas (one pod per node)" "$OUTPUT" "replicas:"
+
+OUTPUT=$(render $BASE --set workloadType=DaemonSet --set strategy.type=OnDelete)
+assert_contains "DaemonSet: strategy maps to updateStrategy" "$OUTPUT" "updateStrategy:"
+
+OUTPUT=$(render $BASE --set workloadType=Job --set job.backoffLimit=3 \
+  --set job.ttlSecondsAfterFinished=600 --set job.parallelism=2)
+assert_contains "Job: correct kind" "$OUTPUT" "kind: Job"
+assert_contains "Job: batch/v1" "$OUTPUT" "apiVersion: batch/v1"
+assert_contains "Job: backoffLimit" "$OUTPUT" "backoffLimit: 3"
+assert_contains "Job: ttlSecondsAfterFinished" "$OUTPUT" "ttlSecondsAfterFinished: 600"
+assert_contains "Job: parallelism" "$OUTPUT" "parallelism: 2"
+assert_contains "Job: restartPolicy coerced to OnFailure" "$OUTPUT" "restartPolicy: OnFailure"
+assert_not_contains "Job: no selector (controller owns it)" "$OUTPUT" "matchLabels:"
+
+OUTPUT=$(render $BASE --set workloadType=Job --set restartPolicy=Never)
+assert_contains "Job: explicit restartPolicy Never is honoured" "$OUTPUT" "restartPolicy: Never"
+
+OUTPUT=$(render $BASE --set workloadType=CronJob --set cronJob.schedule='0 3 * * *' \
+  --set cronJob.concurrencyPolicy=Forbid --set cronJob.successfulJobsHistoryLimit=2 \
+  --set cronJob.suspend=true --set cronJob.timeZone=UTC)
+assert_contains "CronJob: correct kind" "$OUTPUT" "kind: CronJob"
+assert_contains "CronJob: schedule quoted" "$OUTPUT" 'schedule: "0 3 * * *"'
+assert_contains "CronJob: jobTemplate wrapper" "$OUTPUT" "jobTemplate:"
+assert_contains "CronJob: concurrencyPolicy" "$OUTPUT" "concurrencyPolicy: Forbid"
+assert_contains "CronJob: successfulJobsHistoryLimit" "$OUTPUT" "successfulJobsHistoryLimit: 2"
+assert_contains "CronJob: suspend" "$OUTPUT" "suspend: true"
+assert_contains "CronJob: timeZone" "$OUTPUT" 'timeZone: "UTC"'
+assert_contains "CronJob: restartPolicy coerced to OnFailure" "$OUTPUT" "restartPolicy: OnFailure"
+
+OUTPUT=$(render $BASE --set workloadType=CronJob 2>&1 || true)
+assert_contains "CronJob: missing schedule fails with a clear message" \
+  "$OUTPUT" "requires cronJob.schedule"
+
+# Regression guards: the batch work must not alter the default path.
+OUTPUT=$(render $BASE)
+assert_contains "Deployment: still the default kind" "$OUTPUT" "kind: Deployment"
+assert_contains "Deployment: still has replicas" "$OUTPUT" "replicas: 1"
+assert_contains "Deployment: restartPolicy still Always" "$OUTPUT" "restartPolicy: Always"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# PrometheusRule
+# ─────────────────────────────────────────────────────────────────────────────
+printf "\n${YELLOW}━━━ PrometheusRule ━━━${NC}\n"
+
+OUTPUT=$(render $BASE)
+assert_not_contains "PrometheusRule: absent by default" "$OUTPUT" "kind: PrometheusRule"
+
+OUTPUT=$(render $BASE --set 'metrics.rules[0].alert=AppDown' \
+  --set 'metrics.rules[0].expr=up == 0' --set 'metrics.rules[0].for=5m' \
+  --set 'metrics.labels.release=kube-prometheus-stack')
+assert_contains "PrometheusRule: rendered when rules are set" "$OUTPUT" "kind: PrometheusRule"
+assert_contains "PrometheusRule: group named after the release" "$OUTPUT" "- name: test-hull"
+assert_contains "PrometheusRule: alert carried through" "$OUTPUT" "alert: AppDown"
+assert_contains "PrometheusRule: for carried through" "$OUTPUT" "for: 5m"
+assert_contains "PrometheusRule: discovery labels applied" "$OUTPUT" "release: kube-prometheus-stack"
+
+OUTPUT=$(render $BASE --set metrics.enabled=false \
+  --set 'metrics.rules[0].alert=X' --set 'metrics.rules[0].expr=up == 0')
+assert_contains "PrometheusRule: independent of metrics.enabled" "$OUTPUT" "kind: PrometheusRule"
+assert_not_contains "PrometheusRule: no ServiceMonitor when metrics disabled" \
+  "$OUTPUT" "kind: ServiceMonitor"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Database (CNPG + external)
+# ─────────────────────────────────────────────────────────────────────────────
+printf "\n${YELLOW}━━━ Database (CNPG + external) ━━━${NC}\n"
+
+OUTPUT=$(render -f "$CHART_DIR/ci/database-cnpg-values.yaml")
+assert_contains "Database: CNPG Cluster rendered" "$OUTPUT" "kind: Cluster"
+assert_contains "Database: cluster named <release>-<dbname>" "$OUTPUT" "name: test-hull-main"
+assert_contains "Database: instances honoured" "$OUTPUT" "instances: 2"
+assert_contains "Database: storage size" "$OUTPUT" "size: 10Gi"
+assert_contains "Database: walStorage size" "$OUTPUT" "size: 5Gi"
+assert_contains "Database: bootstrap database name" "$OUTPUT" "database: immich"
+assert_contains "Database: podMonitor enabled" "$OUTPUT" "enablePodMonitor: true"
+assert_contains "Database: ScheduledBackup rendered" "$OUTPUT" "kind: ScheduledBackup"
+assert_contains "Database: backup schedule" "$OUTPUT" 'schedule: "0 0 * * *"'
+assert_contains "Database: Pooler rendered" "$OUTPUT" "kind: Pooler"
+assert_contains "Database: pooler mode" "$OUTPUT" "poolMode: session"
+assert_contains "Database: env injected into the app container" "$OUTPUT" "DATABASE_URL"
+assert_contains "Database: password env injected" "$OUTPUT" "DATABASE_PASSWORD"
+
+OUTPUT=$(render -f "$CHART_DIR/ci/database-external-values.yaml")
+assert_not_contains "Database: external type renders no CNPG Cluster" "$OUTPUT" "kind: Cluster"
+assert_not_contains "Database: external type renders no Pooler" "$OUTPUT" "kind: Pooler"
+assert_contains "Database: external still renders the workload" "$OUTPUT" "kind: Deployment"
+
+OUTPUT=$(render $BASE)
+assert_not_contains "Database: absent by default" "$OUTPUT" "kind: Cluster"
+
 printf "\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
 printf "Results: ${GREEN}%d passed${NC}, ${RED}%d failed${NC}\n" "$PASS" "$FAIL"
 

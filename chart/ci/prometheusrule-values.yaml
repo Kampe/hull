@@ -1,0 +1,24 @@
+image:
+  repository: nginx
+  tag: "1.27"
+ports:
+  - name: http
+    containerPort: 8080
+  - name: metrics
+    containerPort: 9090
+metrics:
+  enabled: true
+  port: metrics
+  labels:
+    release: kube-prometheus-stack
+  ruleInterval: 1m
+  rules:
+    - alert: AppDown
+      expr: up{job="app"} == 0
+      for: 5m
+      labels:
+        severity: critical
+      annotations:
+        summary: "app is down"
+    - record: app:requests:rate5m
+      expr: rate(http_requests_total[5m])

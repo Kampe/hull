@@ -21,6 +21,28 @@ fullnameOverride: ""
 # -- Workload type: Deployment (default) or StatefulSet
 workloadType: Deployment
 
+# Job settings. Only read when workloadType is Job or CronJob.
+# restartPolicy is forced to OnFailure for these kinds unless you set Never:
+# Kubernetes rejects Always on a batch pod.
+job: {}
+  # backoffLimit: 6
+  # completions: 1
+  # parallelism: 1
+  # activeDeadlineSeconds: 3600
+  # ttlSecondsAfterFinished: 600   # auto-clean finished Jobs
+
+# CronJob settings. Only read when workloadType is CronJob.
+# schedule is required for that kind; the chart fails with a clear message
+# rather than rendering a CronJob the API server will reject.
+cronJob: {}
+  # schedule: "0 3 * * *"
+  # timeZone: "America/Chicago"
+  # concurrencyPolicy: Forbid     # Allow | Forbid | Replace
+  # startingDeadlineSeconds: 300
+  # successfulJobsHistoryLimit: 3
+  # failedJobsHistoryLimit: 1
+  # suspend: false
+
 # -- Number of replicas
 replicas: 1
 
@@ -331,6 +353,18 @@ metrics:
   interval: 30s
   # -- Additional labels for the ServiceMonitor
   labels: {}
+  # Alert/recording rules. Rendered as a PrometheusRule in one group named
+  # after the release. Independent of `enabled`: rules without a scrape are
+  # still valid if something else scrapes the target.
+  rules: []
+    # - alert: AppDown
+    #   expr: up{job="myapp"} == 0
+    #   for: 5m
+    #   labels:
+    #     severity: critical
+    #   annotations:
+    #     summary: "myapp is down"
+  # ruleInterval: 1m
 
 # ---------------------------------------------------------------------------
 # Service Account

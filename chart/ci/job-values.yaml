@@ -1,0 +1,14 @@
+image:
+  repository: bitnami/kubectl
+  tag: "1.31"
+workloadType: Job
+command: ["/bin/sh", "-c"]
+args: ["echo migrating && sleep 1"]
+job:
+  backoffLimit: 3
+  ttlSecondsAfterFinished: 600
+  activeDeadlineSeconds: 1800
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi

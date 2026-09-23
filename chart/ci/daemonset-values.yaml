@@ -1,0 +1,17 @@
+image:
+  repository: ghcr.io/prometheus/node-exporter
+  tag: v1.8.2
+workloadType: DaemonSet
+hostNetwork: true
+ports:
+  - name: metrics
+    containerPort: 9100
+strategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxUnavailable: 1
+tolerations:
+  - operator: Exists
+metrics:
+  enabled: true
+  port: metrics

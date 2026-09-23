@@ -1,0 +1,26 @@
+{{- /* Alerting is the other half of metrics: hull could already scrape via
+     ServiceMonitor but had no way to say what "bad" looks like. Rendered
+     independently of metrics.enabled -- setting rules and getting nothing
+     because a separate flag was off is exactly the kind of footgun this
+     chart avoids. */}}
+{{- if .Values.metrics.rules }}
+{{- $fullname := include "hull.fullname" . -}}
+{{- $labels := include "hull.labels" . -}}
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ $fullname }}
+  labels:
+    {{- $labels | nindent 4 }}
+    {{- with .Values.metrics.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  groups:
+    - name: {{ $fullname }}
+      {{- with .Values.metrics.ruleInterval }}
+      interval: {{ . }}
+      {{- end }}
+      rules:
+        {{- toYaml .Values.metrics.rules | nindent 8 }}
+{{- end }}

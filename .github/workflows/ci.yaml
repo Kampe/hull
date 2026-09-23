@@ -20,27 +20,27 @@ jobs:
       - name: Helm lint
         run: helm lint chart/
 
+  # The values matrix is discovered rather than listed: a hardcoded list means
+  # a new chart/ci/*.yaml is silently untested until someone remembers to edit
+  # this file, which is how coverage quietly rots.
+  discover-values:
+    runs-on: ubuntu-latest
+    outputs:
+      values: ${{ steps.find.outputs.values }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: find
+        run: |
+          list=$(ls chart/ci/*.yaml | xargs -n1 basename | jq -R . | jq -sc .)
+          echo "values=$list" >> "$GITHUB_OUTPUT"
+          echo "Discovered: $list"
+
   template-test:
+    needs: discover-values
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        values:
-          - advanced-services-values.yaml
-          - envfrom-values.yaml
-          - minimal-values.yaml
-          - single-container-values.yaml
-          - multi-container-values.yaml
-          - ingress-values.yaml
-          - ingress-disabled-integrations-values.yaml
-          - persistence-values.yaml
-          - metrics-values.yaml
-          - pdb-values.yaml
-          - security-values.yaml
-          - statefulset-vct-values.yaml
-          - gateway-values.yaml
-          - full-values.yaml
-          - database-cnpg-values.yaml
-          - database-external-values.yaml
+        values: ${{ fromJSON(needs.discover-values.outputs.values) }}
     steps:
       - uses: actions/checkout@v4
       - uses: azure/setup-helm@v4
@@ -48,6 +48,36 @@ jobs:
           version: v3.17.3
       - name: "Template: ${{ matrix.values }}"
         run: helm template test chart/ -f "chart/ci/${{ matrix.values }}"
+
+  # helm lint and helm template only prove the chart produces YAML. kubeconform
+  # checks that YAML against real Kubernetes API schemas, which is what catches
+  # a manifest that renders fine and is rejected at apply time.
+  kubeconform:
+    needs: discover-values
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+        with:
+          version: v3.17.3
+      - name: Install kubeconform
+        run: |
+          curl -sSL -o /tmp/kubeconform.tar.gz \
+            https://github.com/yannh/kubeconform/releases/download/v0.6.7/kubeconform-linux-amd64.tar.gz
+          tar -xzf /tmp/kubeconform.tar.gz -C /tmp kubeconform
+          sudo install /tmp/kubeconform /usr/local/bin/
+      - name: Validate rendered manifests
+        run: |
+          rc=0
+          for f in chart/ci/*.yaml; do
+            echo "── $(basename "$f")"
+            helm template test chart/ -f "$f" \
+              | kubeconform -strict -summary \
+                  -schema-location default \
+                  -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
+                  -ignore-missing-schemas || rc=1
+          done
+          exit $rc
 
   test-suite:
     runs-on: ubuntu-latest

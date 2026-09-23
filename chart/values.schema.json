@@ -17,7 +17,29 @@
     },
     "nameOverride": { "type": "string" },
     "fullnameOverride": { "type": "string" },
-    "workloadType": { "type": "string", "enum": ["Deployment", "StatefulSet"] },
+    "workloadType": { "type": "string", "enum": ["Deployment", "StatefulSet", "DaemonSet", "Job", "CronJob"] },
+    "job": {
+      "type": "object", "additionalProperties": false,
+      "properties": {
+        "backoffLimit": { "type": "integer", "minimum": 0 },
+        "completions": { "type": "integer", "minimum": 1 },
+        "parallelism": { "type": "integer", "minimum": 0 },
+        "activeDeadlineSeconds": { "type": "integer", "minimum": 1 },
+        "ttlSecondsAfterFinished": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "cronJob": {
+      "type": "object", "additionalProperties": false,
+      "properties": {
+        "schedule": { "type": "string", "minLength": 1 },
+        "timeZone": { "type": "string" },
+        "concurrencyPolicy": { "type": "string", "enum": ["Allow", "Forbid", "Replace"] },
+        "startingDeadlineSeconds": { "type": "integer", "minimum": 0 },
+        "successfulJobsHistoryLimit": { "type": "integer", "minimum": 0 },
+        "failedJobsHistoryLimit": { "type": "integer", "minimum": 0 },
+        "suspend": { "type": "boolean" }
+      }
+    },
     "replicas": { "type": "integer", "minimum": 0 },
     "revisionHistoryLimit": { "type": ["integer", "null"], "minimum": 0 },
     "strategy": { "type": "object" },
@@ -124,7 +146,22 @@
         "port": { "type": ["string", "integer"] },
         "path": { "type": "string" },
         "interval": { "type": "string" },
-        "labels": { "type": "object" }
+        "labels": { "type": "object" },
+        "ruleInterval": { "type": "string" },
+        "rules": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "alert": { "type": "string" },
+              "record": { "type": "string" },
+              "expr": { "type": ["string", "number"] },
+              "for": { "type": "string" },
+              "labels": { "type": "object" },
+              "annotations": { "type": "object" }
+            }
+          }
+        }
       }
     },
     "serviceAccount": {

@@ -402,6 +402,28 @@ metrics:
 
 Generates a `ServiceMonitor` with `instance: primary` label by default (configurable via `labels`).
 
+### Alerting Rules (PrometheusRule)
+
+```yaml
+metrics:
+  rules:
+    - alert: AppDown
+      expr: up{job="myapp"} == 0
+      for: 5m
+      labels:
+        severity: critical
+      annotations:
+        summary: "myapp is down"
+    - record: app:requests:rate5m
+      expr: rate(http_requests_total[5m])
+  # ruleInterval: 1m
+```
+
+Rendered as a single PrometheusRule group named after the release, carrying
+`metrics.labels` so your Prometheus operator picks it up. Independent of
+`metrics.enabled` — setting rules and getting nothing because a separate flag
+was off would be exactly the kind of footgun this chart avoids.
+
 ### Service Account & RBAC
 
 ```yaml
@@ -442,7 +464,39 @@ workloadType: Deployment
 
 # StatefulSet (auto-sets serviceName)
 workloadType: StatefulSet
+
+# DaemonSet — one pod per node. No replicas; `strategy` maps to updateStrategy.
+workloadType: DaemonSet
+
+# Job — run once to completion.
+workloadType: Job
+job:
+  backoffLimit: 3
+  ttlSecondsAfterFinished: 600   # auto-clean when finished
+  # completions / parallelism / activeDeadlineSeconds also supported
+
+# CronJob — scheduled Job. `cronJob.schedule` is required.
+workloadType: CronJob
+cronJob:
+  schedule: "0 3 * * *"
+  timeZone: America/Chicago
+  concurrencyPolicy: Forbid      # Allow | Forbid | Replace
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+job:
+  backoffLimit: 2                # job.* applies to the generated Job too
 ```
+
+All five kinds share one pod spec, so probes, sidecars, persistence,
+securityPreset and the rest behave identically across them.
+
+Two conveniences for the batch kinds:
+
+- **`restartPolicy` is coerced to `OnFailure`** for Job and CronJob. Kubernetes
+  rejects `Always` on a batch pod, so the chart would otherwise render a
+  manifest the API server refuses. An explicit `Never` or `OnFailure` wins.
+- **A CronJob without `cronJob.schedule` fails at template time** with a clear
+  message rather than producing an invalid CronJob.
 
 ### Pod Spec
 
