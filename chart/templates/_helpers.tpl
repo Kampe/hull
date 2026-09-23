@@ -770,6 +770,9 @@ template:
           {{- range .Values.ports }}
           - name: {{ .name | default "http" }}
             containerPort: {{ .containerPort }}
+            {{- if .hostPort }}
+            hostPort: {{ .hostPort }}
+            {{- end }}
             protocol: {{ .protocol | default "TCP" }}
           {{- end }}
         {{- end }}
@@ -857,6 +860,9 @@ template:
           {{- range $sidecarPorts }}
           - name: {{ .name | default $name }}
             containerPort: {{ .containerPort }}
+            {{- if .hostPort }}
+            hostPort: {{ .hostPort }}
+            {{- end }}
             protocol: {{ .protocol | default "TCP" }}
           {{- end }}
         {{- end }}

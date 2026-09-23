@@ -693,6 +693,39 @@ assert "Schema: accepts named ingress ports and integer metrics ports" \
   "[[ '$SCHEMA_TYPES_RESULT' == 'ok' ]]"
 
 # ============================================================================
+# hostPort
+# ============================================================================
+printf "\n${YELLOW}hostPort${NC}\n"
+
+HOSTPORT_DIR=$(mktemp -d /tmp/hull-hostport.XXXXXX)
+cat > "$HOSTPORT_DIR/hostport.yaml" <<EOF
+image:
+  repository: nginx
+  tag: "1.0"
+ports:
+  - name: http
+    containerPort: 32400
+    hostPort: 32400
+EOF
+cat > "$HOSTPORT_DIR/nohostport.yaml" <<EOF
+image:
+  repository: nginx
+  tag: "1.0"
+ports:
+  - name: http
+    containerPort: 8080
+EOF
+
+HOSTPORT_OUT="$(render -f "$HOSTPORT_DIR/hostport.yaml")"
+NOHOSTPORT_OUT="$(render -f "$HOSTPORT_DIR/nohostport.yaml")"
+
+assert "hostPort: renders on the main container when set" \
+  "grep -q 'hostPort: 32400' <<< \"\$HOSTPORT_OUT\""
+
+assert "hostPort: omitted entirely when not set" \
+  "! grep -q 'hostPort' <<< \"\$NOHOSTPORT_OUT\""
+
+# ============================================================================
 # Summary
 # ============================================================================
 
