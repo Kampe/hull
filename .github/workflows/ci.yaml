@@ -91,7 +91,7 @@ jobs:
 
   release:
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    needs: [lint, template-test, test-suite]
+    needs: [lint, template-test, kubeconform, test-suite]
     runs-on: ubuntu-latest
     permissions:
       contents: read
