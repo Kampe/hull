@@ -21,6 +21,9 @@ metadata:
   {{- end }}
 spec:
   type: {{ $svcConfig.type | default "ClusterIP" }}
+  {{- if and (has ($svcConfig.type | default "ClusterIP") (list "LoadBalancer" "NodePort")) $svcConfig.externalTrafficPolicy }}
+  externalTrafficPolicy: {{ $svcConfig.externalTrafficPolicy }}
+  {{- end }}
   {{- if and (eq ($svcConfig.type | default "ClusterIP") "LoadBalancer") $svcConfig.loadBalancerIP }}
   loadBalancerIP: {{ $svcConfig.loadBalancerIP }}
   {{- end }}

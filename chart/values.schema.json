@@ -1002,6 +1002,13 @@
         },
         "loadBalancerIP": {
           "type": "string"
+        },
+        "externalTrafficPolicy": {
+          "type": "string",
+          "enum": [
+            "Cluster",
+            "Local"
+          ]
         }
       }
     },

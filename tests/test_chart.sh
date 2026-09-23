@@ -726,6 +726,46 @@ assert "hostPort: omitted entirely when not set" \
   "! grep -q 'hostPort' <<< \"\$NOHOSTPORT_OUT\""
 
 # ============================================================================
+# externalTrafficPolicy
+# ============================================================================
+printf "\n${YELLOW}externalTrafficPolicy${NC}\n"
+
+ETP_DIR=$(mktemp -d /tmp/hull-etp.XXXXXX)
+cat > "$ETP_DIR/etp.yaml" <<EOF
+image:
+  repository: nginx
+  tag: "1.0"
+ports:
+  - name: http
+    containerPort: 32400
+service:
+  main:
+    port: 32400
+    type: LoadBalancer
+    externalTrafficPolicy: Local
+EOF
+cat > "$ETP_DIR/noetp.yaml" <<EOF
+image:
+  repository: nginx
+  tag: "1.0"
+ports:
+  - name: http
+    containerPort: 8080
+service:
+  main:
+    port: 8080
+EOF
+
+ETP_OUT="$(render -f "$ETP_DIR/etp.yaml")"
+NOETP_OUT="$(render -f "$ETP_DIR/noetp.yaml")"
+
+assert "externalTrafficPolicy: rendered on a LoadBalancer service" \
+  "grep -q 'externalTrafficPolicy: Local' <<< \"\$ETP_OUT\""
+
+assert "externalTrafficPolicy: omitted on a plain ClusterIP service" \
+  "! grep -q 'externalTrafficPolicy' <<< \"\$NOETP_OUT\""
+
+# ============================================================================
 # Summary
 # ============================================================================
 
