@@ -66,11 +66,15 @@ env: {}
 envFrom: []
 
 # -- Ports for the main container
-# -- Each entry: name, containerPort, protocol (default TCP)
+# -- Each entry: name, containerPort, hostPort (optional), protocol (default TCP)
 # -- If empty, no ports are exposed and no probes are generated
+# -- hostPort binds the port on the node itself. Prefer it over
+# -- hostNetwork: true when an app only needs one real LAN address -- the
+# -- pod keeps its own network namespace, so NetworkPolicy still applies.
 ports: []
   # - name: http
   #   containerPort: 8080
+  #   hostPort: 8080
   #   protocol: TCP
 
 # -- Probe configuration for the main container
