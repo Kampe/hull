@@ -403,6 +403,17 @@
     "dnsConfig": {
       "type": "object"
     },
+    "hostAliases": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["ip", "hostnames"],
+        "properties": {
+          "ip": {"type": "string"},
+          "hostnames": {"type": "array", "items": {"type": "string"}}
+        }
+      }
+    },
     "dnsPolicy": {
       "type": "string"
     },

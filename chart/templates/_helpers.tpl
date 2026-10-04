@@ -670,6 +670,10 @@ template:
     dnsConfig:
       {{- toYaml . | nindent 6 }}
     {{- end }}
+    {{- with .Values.hostAliases }}
+    hostAliases:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
     terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds | default 30 }}
     {{- /* Kubernetes rejects restartPolicy Always on Job and CronJob pods.
          values.yaml carries Always as the chart-wide default, so `default`

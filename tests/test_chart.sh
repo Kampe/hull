@@ -765,6 +765,22 @@ assert "externalTrafficPolicy: rendered on a LoadBalancer service" \
 assert "externalTrafficPolicy: omitted on a plain ClusterIP service" \
   "! grep -q 'externalTrafficPolicy' <<< \"\$NOETP_OUT\""
 
+# hostAliases
+printf "\n${YELLOW}hostAliases${NC}\n"
+cat > "$ETP_DIR/ha.yaml" <<EOF
+image:
+  repository: nginx
+  tag: "1.0"
+hostAliases:
+  - ip: 127.0.0.1
+    hostnames: [www.example.com]
+EOF
+HA_OUT="$(render -f "$ETP_DIR/ha.yaml")"
+assert "hostAliases: rendered into the pod spec" \
+  "grep -A3 'hostAliases:' <<< \"\$HA_OUT\" | grep -q 'www.example.com'"
+assert "hostAliases: omitted by default" \
+  "! grep -q 'hostAliases' <<< \"\$NOETP_OUT\""
+
 # ============================================================================
 # Summary
 # ============================================================================

@@ -464,6 +464,8 @@ affinity: {}
 topologySpreadConstraints: []
 # -- DNS config
 dnsConfig: {}
+# -- Extra /etc/hosts entries for the pod, e.g. [{ip: 127.0.0.1, hostnames: [example.com]}]
+hostAliases: []
 # -- DNS policy
 dnsPolicy: ""
 # -- Termination grace period
